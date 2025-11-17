@@ -1,0 +1,200 @@
+name: terraform-azure-function-infra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/az-function/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'terraform/az-function/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Acción a ejecutar: plan | apply'
+        required: true
+        default: 'plan'
+        type: choice
+        options: [plan, apply]
+      environment:
+        description: 'Entorno destino (dev|stg|prod)'
+        required: true
+        default: 'dev'
+
+permissions:
+  contents: read
+  id-token: write  # Para OIDC con Azure
+
+concurrency:
+  group: terraform-az-function-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_WORKING_DIR: terraform/az-function
+  TF_CACHE_KEY: terraform-az-function-${{ runner.os }}-${{ hashFiles('terraform/az-function/.terraform.lock.hcl') }}
+
+jobs:
+  validate:
+    name: Validar Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+          terraform_wrapper: false
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_WORKING_DIR }}/.terraform
+          key: ${{ env.TF_CACHE_KEY }}
+          restore-keys: |
+            terraform-az-function-${{ runner.os }}-
+
+      - name: Terraform Init (sin backend remoto)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Fmt Check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Summary
+        run: echo "✅ Validación completada" >> $GITHUB_STEP_SUMMARY
+
+  plan:
+    name: Plan Terraform
+    runs-on: ubuntu-latest
+    needs: validate
+    if: >-
+      ${{ github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+          terraform_wrapper: false
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_WORKING_DIR }}/.terraform
+          key: ${{ env.TF_CACHE_KEY }}
+          restore-keys: |
+            terraform-az-function-${{ runner.os }}-
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Show Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform show -no-color tfplan > plan.txt
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+
+      - name: Upload Plan Text
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-text
+          path: ${{ env.TF_WORKING_DIR }}/plan.txt
+
+      - name: Summary
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "### Terraform Plan" >> $GITHUB_STEP_SUMMARY
+          echo "\n\n" >> $GITHUB_STEP_SUMMARY
+          sed -n '1,200p' plan.txt >> $GITHUB_STEP_SUMMARY
+
+  apply:
+    name: Apply Terraform
+    runs-on: ubuntu-latest
+    needs: plan
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply') }}
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.0'
+          terraform_wrapper: false
+
+      - name: Cache Terraform plugins
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_WORKING_DIR }}/.terraform
+          key: ${{ env.TF_CACHE_KEY }}
+          restore-keys: |
+            terraform-az-function-${{ runner.os }}-
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download Plan Artifact (si existe)
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false -auto-approve tfplan || terraform apply -input=false -auto-approve
+
+      - name: Terraform Outputs (no sensibles)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform output -json | jq 'del(.storage_account_primary_connection_string, .app_insights_instrumentation_key, .app_insights_connection_string, .function_master_key, .function_default_function_key)' > outputs.json
+
+      - name: Publicar summary
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "### Terraform Outputs (no sensibles)" >> $GITHUB_STEP_SUMMARY
+          cat outputs.json >> $GITHUB_STEP_SUMMARY
+
+      - name: Subir outputs completos (incluye sensibles en json cifrado del repo) **NO RECOMENDADO**
+        if: false # Desactivado por seguridad
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-outputs-all
+          path: ${{ env.TF_WORKING_DIR }}/outputs.json
+
+      - name: Post Health Check (placeholder)
+        run: echo "Implementar script de health check si aplica" >> $GITHUB_STEP_SUMMARY
