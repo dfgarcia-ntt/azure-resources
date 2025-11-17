@@ -64,12 +64,13 @@ concurrency:
 
 env:
   TF_WORKING_DIR: terraform/az-function
-  TF_CACHE_KEY: terraform-az-function-${{ runner.os }}-${{ hashFiles('terraform/az-function/.terraform.lock.hcl') }}
 
 jobs:
   validate:
     name: Validar Terraform
     runs-on: ubuntu-latest
+    env:
+      TF_CACHE_KEY: terraform-az-function-${{ runner.os }}-${{ hashFiles('terraform/az-function/.terraform.lock.hcl') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,6 +110,8 @@ jobs:
     needs: validate
     if: >-
       ${{ github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.action == 'plan') }}
+    env:
+      TF_CACHE_KEY: terraform-az-function-${{ runner.os }}-${{ hashFiles('terraform/az-function/.terraform.lock.hcl') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -191,6 +194,8 @@ jobs:
     needs: plan
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply') }}
     environment: ${{ inputs.environment || 'prod' }}
+    env:
+      TF_CACHE_KEY: terraform-az-function-${{ runner.os }}-${{ hashFiles('terraform/az-function/.terraform.lock.hcl') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
