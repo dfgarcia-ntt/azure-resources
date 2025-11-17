@@ -126,6 +126,7 @@ jobs:
             terraform-az-function-${{ runner.os }}-
 
       - name: Azure Login (OIDC)
+        if: false  # Deshabilitado: configurar secrets antes de habilitar
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -136,7 +137,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          cat > workflow-inputs.auto.tfvars.json <<'EOF'
+          if [ ! -f workflow-inputs.auto.tfvars.json ]; then
           {
             "project": "${{ inputs.project }}",
             "environment": "${{ inputs.environment }}",
@@ -208,6 +209,7 @@ jobs:
             terraform-az-function-${{ runner.os }}-
 
       - name: Azure Login (OIDC)
+        if: false  # Deshabilitado: configurar secrets antes de habilitar
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
