@@ -21,6 +21,38 @@ on:
         description: 'Entorno destino (dev|stg|prod)'
         required: true
         default: 'dev'
+        type: choice
+        options: [dev, stg, prod]
+      project:
+        description: 'Nombre corto proyecto (a-z0-9-)'
+        required: true
+        default: 'myproj'
+      location:
+        description: 'Región Azure (ej: westeurope)'
+        required: true
+        default: 'westeurope'
+      owner:
+        description: 'Propietario (email)'
+        required: true
+        default: 'owner@example.com'
+      cost_center:
+        description: 'Centro de costo'
+        required: true
+        default: 'CC-1234'
+      runtime:
+        description: 'Runtime Functions'
+        required: true
+        type: choice
+        default: 'dotnet-isolated'
+        options: [dotnet-isolated, dotnet, node, python, java, powershell]
+      plan_sku_tier:
+        description: 'Tier App Service Plan (Dynamic, Premium, etc.)'
+        required: true
+        default: 'Dynamic'
+      plan_sku_size:
+        description: 'SKU size (Y1, EP1, P1v3, etc.)'
+        required: true
+        default: 'Y1'
 
 permissions:
   contents: read
@@ -102,6 +134,25 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Inyectar variables (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          cat > workflow-inputs.auto.tfvars.json <<'EOF'
+          {
+            "project": "${{ inputs.project }}",
+            "environment": "${{ inputs.environment }}",
+            "location": "${{ inputs.location }}",
+            "runtime": "${{ inputs.runtime }}",
+            "plan_sku_tier": "${{ inputs.plan_sku_tier }}",
+            "plan_sku_size": "${{ inputs.plan_sku_size }}",
+            "owner": "${{ inputs.owner }}",
+            "cost_center": "${{ inputs.cost_center }}"
+          }
+          EOF
+          echo "Variables inyectadas:" >> $GITHUB_STEP_SUMMARY
+          cat workflow-inputs.auto.tfvars.json >> $GITHUB_STEP_SUMMARY
+
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init -input=false
@@ -139,7 +190,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: plan
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.action == 'apply') }}
-    environment: ${{ github.event.inputs.environment || 'prod' }}
+    environment: ${{ inputs.environment || 'prod' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -164,6 +215,27 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Inyectar variables (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          if [ ! -f workflow-inputs.auto.tfvars.json ]; then
+            cat > workflow-inputs.auto.tfvars.json <<'EOF'
+            {
+              "project": "${{ inputs.project }}",
+              "environment": "${{ inputs.environment }}",
+              "location": "${{ inputs.location }}",
+              "runtime": "${{ inputs.runtime }}",
+              "plan_sku_tier": "${{ inputs.plan_sku_tier }}",
+              "plan_sku_size": "${{ inputs.plan_sku_size }}",
+              "owner": "${{ inputs.owner }}",
+              "cost_center": "${{ inputs.cost_center }}"
+            }
+            EOF
+          fi
+          echo "Variables inyectadas (apply):" >> $GITHUB_STEP_SUMMARY
+          cat workflow-inputs.auto.tfvars.json >> $GITHUB_STEP_SUMMARY
 
       - name: Download Plan Artifact (si existe)
         uses: actions/download-artifact@v4
