@@ -50,14 +50,15 @@ output "app_insights_connection_string" {
   sensitive   = true
 }
 
-output "function_master_key" {
-  description = "Master host key de la Function App"
-  value       = data.azurerm_function_app_host_keys.host_keys.master_key
-  sensitive   = true
+output "function_app_id" {
+  description = "ID de la Function App"
+  value       = azurerm_linux_function_app.func.id
 }
 
-output "function_default_function_key" {
-  description = "Default function key"
-  value       = data.azurerm_function_app_host_keys.host_keys.default_function_key
-  sensitive   = true
+output "function_app_default_hostname" {
+  description = "Default hostname de la Function App"
+  value       = azurerm_linux_function_app.func.default_hostname
 }
+
+# Nota: Host keys deben obtenerse via Azure CLI: az functionapp keys list
+# No exponerlas directamente en outputs por seguridad

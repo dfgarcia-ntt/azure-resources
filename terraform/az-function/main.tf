@@ -26,7 +26,7 @@ resource "azurerm_storage_account" "funcsa" {
   https_traffic_only_enabled = true
   min_tls_version            = "TLS1_2"
 
-  allow_blob_public_access = false
+  public_network_access_enabled = false
 
   tags = local.common_tags
 }
@@ -40,19 +40,14 @@ resource "azurerm_application_insights" "appi" {
   tags                = local.common_tags
 }
 
-# App Service Plan Linux (consumption si Dynamic/Y1)
-resource "azurerm_app_service_plan" "plan" {
+# Service Plan Linux (consumption si Dynamic/Y1)
+resource "azurerm_service_plan" "plan" {
   name                = local.app_service_plan_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
-  sku {
-    tier = var.plan_sku_tier
-    size = var.plan_sku_size
-  }
-
-  kind     = "linux"
-  reserved = var.plan_reserved
+  os_type  = "Linux"
+  sku_name = var.plan_sku_tier == "Dynamic" ? "Y1" : var.plan_sku_size
 
   tags = local.common_tags
 }
@@ -62,12 +57,11 @@ resource "azurerm_linux_function_app" "func" {
   name                        = local.function_app_name
   resource_group_name         = azurerm_resource_group.rg.name
   location                    = azurerm_resource_group.rg.location
-  service_plan_id             = azurerm_app_service_plan.plan.id
+  service_plan_id             = azurerm_service_plan.plan.id
   storage_account_name        = azurerm_storage_account.funcsa.name
   storage_account_access_key  = azurerm_storage_account.funcsa.primary_access_key
   functions_extension_version = var.functions_extension_version
   https_only                  = true
-  builtin_image_name          = ""
 
   identity {
     type = var.function_app_identity_type
@@ -128,8 +122,5 @@ resource "azurerm_monitor_diagnostic_setting" "func_diag" {
   }
 }
 
-# Host Keys (master key, functions keys)
-data "azurerm_function_app_host_keys" "host_keys" {
-  name                = azurerm_linux_function_app.func.name
-  resource_group_name = azurerm_resource_group.rg.name
-}
+# Host Keys (referencia a la function app para obtener keys)
+# Nota: Las keys se obtienen via Azure CLI o Portal en producción por seguridad

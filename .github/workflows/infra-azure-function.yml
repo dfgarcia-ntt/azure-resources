@@ -251,7 +251,7 @@ jobs:
 
       - name: Terraform Outputs (no sensibles)
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform output -json | jq 'del(.storage_account_primary_connection_string, .app_insights_instrumentation_key, .app_insights_connection_string, .function_master_key, .function_default_function_key)' > outputs.json
+        run: terraform output -json | jq 'del(.storage_account_primary_connection_string, .app_insights_instrumentation_key, .app_insights_connection_string)' > outputs.json
 
       - name: Publicar summary
         working-directory: ${{ env.TF_WORKING_DIR }}
