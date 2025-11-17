@@ -38,7 +38,7 @@ variable "runtime" {
   type        = string
   default     = "dotnet-isolated"
   validation {
-    condition     = contains(["dotnet","dotnet-isolated","node","python","java","powershell"], var.runtime)
+    condition     = contains(["dotnet", "dotnet-isolated", "node", "python", "java", "powershell"], var.runtime)
     error_message = "runtime inválido. Usar uno soportado por Azure Functions."
   }
 }
@@ -84,7 +84,7 @@ variable "storage_account_tier" {
   type        = string
   default     = "Standard"
   validation {
-    condition     = contains(["Standard","Premium"], var.storage_account_tier)
+    condition     = contains(["Standard", "Premium"], var.storage_account_tier)
     error_message = "storage_account_tier debe ser Standard o Premium."
   }
 }
@@ -94,7 +94,7 @@ variable "storage_account_replication" {
   type        = string
   default     = "LRS"
   validation {
-    condition     = contains(["LRS","GRS","RAGRS","ZRS"], var.storage_account_replication)
+    condition     = contains(["LRS", "GRS", "RAGRS", "ZRS"], var.storage_account_replication)
     error_message = "storage_account_replication inválido."
   }
 }
@@ -114,7 +114,7 @@ variable "app_insights_application_type" {
   type        = string
   default     = "web"
   validation {
-    condition     = contains(["web","other"], var.app_insights_application_type)
+    condition     = contains(["web", "other"], var.app_insights_application_type)
     error_message = "app_insights_application_type debe ser web u other."
   }
 }
@@ -218,17 +218,17 @@ variable "app_settings_additional" {
 ############################################################
 
 locals {
-  resource_group_name       = "${var.project}-${var.environment}-rg"
-  storage_account_name      = lower(replace("${var.project}${var.environment}funcst", "-", ""))
-  app_service_plan_name     = "${var.project}-${var.environment}-plan"
-  function_app_name         = "${var.project}-${var.environment}-func"
-  app_insights_name         = "${var.project}-${var.environment}-appi"
+  resource_group_name   = "${var.project}-${var.environment}-rg"
+  storage_account_name  = lower(replace("${var.project}${var.environment}funcst", "-", ""))
+  app_service_plan_name = "${var.project}-${var.environment}-plan"
+  function_app_name     = "${var.project}-${var.environment}-func"
+  app_insights_name     = "${var.project}-${var.environment}-appi"
   common_tags = merge({
-    Environment  = var.environment,
-    Owner        = var.owner,
-    CostCenter   = var.cost_center,
-    Project      = var.project,
-    ManagedBy    = var.managed_by,
-    CreatedDate  = var.created_date
+    Environment = var.environment,
+    Owner       = var.owner,
+    CostCenter  = var.cost_center,
+    Project     = var.project,
+    ManagedBy   = var.managed_by,
+    CreatedDate = var.created_date
   }, var.extra_tags)
 }

@@ -59,15 +59,15 @@ resource "azurerm_app_service_plan" "plan" {
 
 # Function App Linux
 resource "azurerm_linux_function_app" "func" {
-  name                       = local.function_app_name
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = azurerm_resource_group.rg.location
-  service_plan_id            = azurerm_app_service_plan.plan.id
-  storage_account_name       = azurerm_storage_account.funcsa.name
-  storage_account_access_key = azurerm_storage_account.funcsa.primary_access_key
+  name                        = local.function_app_name
+  resource_group_name         = azurerm_resource_group.rg.name
+  location                    = azurerm_resource_group.rg.location
+  service_plan_id             = azurerm_app_service_plan.plan.id
+  storage_account_name        = azurerm_storage_account.funcsa.name
+  storage_account_access_key  = azurerm_storage_account.funcsa.primary_access_key
   functions_extension_version = var.functions_extension_version
-  https_only                 = true
-  builtin_image_name         = ""
+  https_only                  = true
+  builtin_image_name          = ""
 
   identity {
     type = var.function_app_identity_type
@@ -80,11 +80,11 @@ resource "azurerm_linux_function_app" "func" {
   }
 
   app_settings = merge({
-    FUNCTIONS_WORKER_RUNTIME      = var.runtime,
-    AzureWebJobsStorage           = azurerm_storage_account.funcsa.primary_connection_string,
+    FUNCTIONS_WORKER_RUNTIME              = var.runtime,
+    AzureWebJobsStorage                   = azurerm_storage_account.funcsa.primary_connection_string,
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appi.connection_string,
-    APPINSIGHTS_INSTRUMENTATIONKEY         = azurerm_application_insights.appi.instrumentation_key,
-    WEBSITE_RUN_FROM_PACKAGE      = ""
+    APPINSIGHTS_INSTRUMENTATIONKEY        = azurerm_application_insights.appi.instrumentation_key,
+    WEBSITE_RUN_FROM_PACKAGE              = ""
   }, var.app_settings_additional)
 
   tags = local.common_tags
